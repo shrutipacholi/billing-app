@@ -31,10 +31,10 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  getBills: (userId) => request(`/bills/${userId}`),
+  getBills: (userId) => request(`/bills/user?userId=${userId}`),
 
   saveBill: (userId, billData) =>
-    request(`/bills/${userId}`, {
+    request(`/bills/user?userId=${userId}`, {
       method: 'POST',
       body: JSON.stringify(billData),
     }),
