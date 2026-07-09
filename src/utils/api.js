@@ -40,5 +40,5 @@ export const api = {
     }),
 
   deleteBill: (userId, billId) =>
-    request(`/bills/${userId}/${billId}`, { method: 'DELETE' }),
+    request(`/bills/item?userId=${userId}&billId=${billId}`, { method: 'DELETE' }),
 };
