@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import connectDB from '../_lib/db.js';
-import { User, Bill } from '../_lib/models.js';
+import connectDB from '../../_lib/db.js';
+import { User, Bill } from '../../_lib/models.js';
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 
