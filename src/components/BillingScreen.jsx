@@ -5,9 +5,14 @@ import { getUserInvoices, saveInvoice, deleteInvoice } from '../utils/auth';
 export default function BillingScreen({ user }) {
   // Invoices list state
   const [invoices, setInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [saving, setSaving] = useState(false);
   
   // Current billing meta information
   const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -28,11 +33,21 @@ export default function BillingScreen({ user }) {
 
   // Load user invoices history on mount
   useEffect(() => {
-    if (user) {
-      setInvoices(getUserInvoices(user.id));
-      // Auto-generate a dummy invoice number
-      generateNewInvoiceNumber();
-    }
+    const loadInvoices = async () => {
+      if (!user) return;
+      setLoadingInvoices(true);
+      try {
+        const data = await getUserInvoices(user.id);
+        setInvoices(data);
+      } catch (err) {
+        console.error('Failed to load invoices:', err);
+      } finally {
+        setLoadingInvoices(false);
+      }
+    };
+
+    loadInvoices();
+    generateNewInvoiceNumber();
   }, [user]);
 
   const generateNewInvoiceNumber = () => {
@@ -107,7 +122,7 @@ export default function BillingScreen({ user }) {
   };
 
   // Save the complete invoice
-  const handleSaveInvoice = () => {
+  const handleSaveInvoice = async () => {
     if (!clientName.trim()) {
       alert('Please enter a client name.');
       return;
@@ -124,8 +139,11 @@ export default function BillingScreen({ user }) {
 
     const invoiceData = {
       invoiceNumber,
-      clientName: clientName.trim(),
       invoiceDate,
+      clientName: clientName.trim(),
+      clientEmail: clientEmail.trim(),
+      clientPhone: clientPhone.trim(),
+      clientAddress: clientAddress.trim(),
       items: activeItems,
       subtotal,
       discountRate,
@@ -135,9 +153,11 @@ export default function BillingScreen({ user }) {
       grandTotal
     };
 
+    setSaving(true);
     try {
-      const saved = saveInvoice(user.id, invoiceData);
-      setInvoices(getUserInvoices(user.id));
+      const saved = await saveInvoice(user.id, invoiceData);
+      const updated = await getUserInvoices(user.id);
+      setInvoices(updated);
       
       // Open modal view for saved invoice
       setSelectedInvoice(saved);
@@ -145,19 +165,29 @@ export default function BillingScreen({ user }) {
       // Reset Builder
       setActiveItems([]);
       setClientName('');
+      setClientEmail('');
+      setClientPhone('');
+      setClientAddress('');
       setDiscountRate(0);
       generateNewInvoiceNumber();
     } catch (err) {
-      alert('Failed to save invoice.');
+      alert(err.message || 'Failed to save invoice.');
+    } finally {
+      setSaving(false);
     }
   };
 
   // Delete Invoice from History
-  const handleDeleteHistoryInvoice = (id, e) => {
+  const handleDeleteHistoryInvoice = async (id, e) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this invoice?')) {
-      deleteInvoice(user.id, id);
-      setInvoices(getUserInvoices(user.id));
+      try {
+        await deleteInvoice(user.id, id);
+        const updated = await getUserInvoices(user.id);
+        setInvoices(updated);
+      } catch (err) {
+        alert(err.message || 'Failed to delete invoice.');
+      }
     }
   };
 
@@ -291,23 +321,65 @@ export default function BillingScreen({ user }) {
 
         {/* Right Side - Invoice Meta, Summaries & History */}
         <div>
-          {/* Card 3: Billing details & automatic calculations */}
+          {/* Card 3: Customer details, billing meta & automatic calculations */}
           <div className="billing-card glass">
             <h2>
               <FileText size={20} className="text-gradient-indigo-purple" />
-              <span>Invoice Settings</span>
+              <span>Customer & Invoice Details</span>
             </h2>
 
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label" htmlFor="billing-client-name">Client Name</label>
-              <input
-                id="billing-client-name"
-                type="text"
-                className="form-input"
-                placeholder="Enter client or company name"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-              />
+            <div className="customer-details-section">
+              <h3 className="section-label">Customer Details</h3>
+
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label" htmlFor="billing-client-name">Client / Company Name *</label>
+                <input
+                  id="billing-client-name"
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter client or company name"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                />
+              </div>
+
+              <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="billing-client-email">Email</label>
+                  <input
+                    id="billing-client-email"
+                    type="email"
+                    className="form-input"
+                    placeholder="client@email.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="billing-client-phone">Phone</label>
+                  <input
+                    id="billing-client-phone"
+                    type="tel"
+                    className="form-input"
+                    placeholder="+1 (555) 000-0000"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label" htmlFor="billing-client-address">Address</label>
+                <textarea
+                  id="billing-client-address"
+                  className="form-input form-textarea"
+                  placeholder="Street, city, state, zip code"
+                  rows={2}
+                  value={clientAddress}
+                  onChange={(e) => setClientAddress(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '16px' }}>
@@ -398,10 +470,10 @@ export default function BillingScreen({ user }) {
               type="button"
               className="btn btn-primary"
               style={{ width: '100%', marginTop: '24px' }}
-              disabled={activeItems.length === 0}
+              disabled={activeItems.length === 0 || saving}
               onClick={handleSaveInvoice}
             >
-              <Save size={16} /> Save & Generate Bill
+              <Save size={16} /> {saving ? 'Saving to Database...' : 'Save & Generate Bill'}
             </button>
           </div>
 
@@ -412,7 +484,11 @@ export default function BillingScreen({ user }) {
               <span>Bill History</span>
             </h2>
 
-            {invoices.length === 0 ? (
+            {loadingInvoices ? (
+              <div style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Loading bill history...
+              </div>
+            ) : invoices.length === 0 ? (
               <div style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>
                 No previously saved bills.
               </div>
@@ -491,7 +567,15 @@ export default function BillingScreen({ user }) {
               <div className="invoice-bill-to">
                 <h3>Billed To:</h3>
                 <p><strong>{selectedInvoice.clientName}</strong></p>
-                <p style={{ color: '#6b7280', fontSize: '13px' }}>Customer ID: {selectedInvoice.userId}</p>
+                {selectedInvoice.clientEmail && (
+                  <p>{selectedInvoice.clientEmail}</p>
+                )}
+                {selectedInvoice.clientPhone && (
+                  <p>{selectedInvoice.clientPhone}</p>
+                )}
+                {selectedInvoice.clientAddress && (
+                  <p style={{ whiteSpace: 'pre-line' }}>{selectedInvoice.clientAddress}</p>
+                )}
               </div>
 
               <table className="invoice-table">
@@ -570,7 +654,15 @@ export default function BillingScreen({ user }) {
             <div className="invoice-bill-to">
               <h3>Billed To:</h3>
               <p><strong>{selectedInvoice.clientName}</strong></p>
-              <p style={{ color: '#6b7280', fontSize: '13px' }}>Customer ID: {selectedInvoice.userId}</p>
+              {selectedInvoice.clientEmail && (
+                <p>{selectedInvoice.clientEmail}</p>
+              )}
+              {selectedInvoice.clientPhone && (
+                <p>{selectedInvoice.clientPhone}</p>
+              )}
+              {selectedInvoice.clientAddress && (
+                <p style={{ whiteSpace: 'pre-line' }}>{selectedInvoice.clientAddress}</p>
+              )}
             </div>
 
             <table className="invoice-table">

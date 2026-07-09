@@ -8,7 +8,7 @@ export default function Login({ onNavigate, onAuthSuccess }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -19,7 +19,7 @@ export default function Login({ onNavigate, onAuthSuccess }) {
     }
 
     try {
-      const user = loginUser(email, password);
+      const user = await loginUser(email, password);
       setSuccess('Login successful! Welcome back.');
       setTimeout(() => {
         onAuthSuccess(user);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Receipt, LogOut, Menu, X, ChevronLeft, ChevronRight, Users, CreditCard, DollarSign, Activity, Plus } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { LayoutDashboard, Receipt, LogOut, Menu, X, ChevronLeft, ChevronRight, ChevronDown, Users, User, CreditCard, DollarSign, Activity, Plus } from 'lucide-react';
 import BillingScreen from './BillingScreen';
 import { getUserInvoices, logoutUser } from '../utils/auth';
 
@@ -8,13 +8,39 @@ export default function Dashboard({ user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [invoices, setInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load invoices to compute quick statistics
   useEffect(() => {
-    if (user) {
-      setInvoices(getUserInvoices(user.id));
-    }
-  }, [user, activeTab]); // Refresh stats when active tab changes (e.g. after adding a bill)
+    const loadInvoices = async () => {
+      if (!user) return;
+      setLoadingInvoices(true);
+      try {
+        const data = await getUserInvoices(user.id);
+        setInvoices(data);
+      } catch (err) {
+        console.error('Failed to load invoices:', err);
+        setInvoices([]);
+      } finally {
+        setLoadingInvoices(false);
+      }
+    };
+
+    loadInvoices();
+  }, [user, activeTab]);
 
   const handleLogout = () => {
     logoutUser();
@@ -128,8 +154,57 @@ export default function Dashboard({ user, onLogout }) {
           <h1 className="navbar-title">
             {activeTab === 'overview' ? 'Analytics Dashboard' : 'Billing Generator'}
           </h1>
-          <div className="no-print" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Welcome back, <strong style={{ color: 'var(--text-primary)' }}>{user?.name}</strong>
+          <div className="navbar-right">
+            <span className="navbar-welcome no-print">
+              Welcome back, <strong>{user?.name}</strong>
+            </span>
+            <div ref={dropdownRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className={`user-profile-btn ${userDropdownOpen ? 'open' : ''}`}
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+              >
+                <div className="user-profile-avatar">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span className="user-profile-name">{user?.name || 'User'}</span>
+                <ChevronDown size={16} className="user-profile-chevron" />
+              </button>
+
+              {userDropdownOpen && (
+                <div className="user-dropdown">
+                  <div className="user-dropdown-header">
+                    <div className="user-dropdown-name">{user?.name || 'User'}</div>
+                    <div className="user-dropdown-email">{user?.email || 'No email'}</div>
+                    <div className="user-dropdown-role">Administrator</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="user-dropdown-item"
+                    onClick={() => { setActiveTab('overview'); setUserDropdownOpen(false); }}
+                  >
+                    <LayoutDashboard size={16} />
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    className="user-dropdown-item"
+                    onClick={() => { setActiveTab('billing'); setUserDropdownOpen(false); }}
+                  >
+                    <Receipt size={16} />
+                    Billing Generator
+                  </button>
+                  <button
+                    type="button"
+                    className="user-dropdown-item danger"
+                    onClick={handleLogout}
+                  >
+                    <LogOut size={16} />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -182,7 +257,7 @@ export default function Dashboard({ user, onLogout }) {
               </div>
 
               {/* Main Dash Body: Recent Invoices & Quick Actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
                 
                 {/* Recent Billing Records Card */}
                 <div className="billing-card glass">
@@ -191,7 +266,11 @@ export default function Dashboard({ user, onLogout }) {
                     <span>Recent Invoices</span>
                   </h2>
 
-                  {invoices.length === 0 ? (
+                  {loadingInvoices ? (
+                    <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      Loading invoices...
+                    </div>
+                  ) : invoices.length === 0 ? (
                     <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                       <p>You haven't generated any invoices yet.</p>
                       <button 

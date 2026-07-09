@@ -10,7 +10,7 @@ export default function SignUp({ onNavigate, onAuthSuccess }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -32,7 +32,7 @@ export default function SignUp({ onNavigate, onAuthSuccess }) {
     }
 
     try {
-      const user = registerUser(name, email, password);
+      const user = await registerUser(name, email, password);
       setSuccess('Account created successfully! Redirecting...');
       setTimeout(() => {
         onAuthSuccess(user);
